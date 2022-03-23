@@ -46,6 +46,25 @@
         #forwarded-by > a {
             text-decoration: none;
         }
+        @media screen and (max-width: 650px) {
+            .channel-info {
+                top: 0;
+                height: 40vh;
+                width: 100vw;
+                border-right: none;
+                border-bottom: 1px solid rgb(215, 215, 215);
+            }
+            #map {
+                height: 60vh;
+                width: 100vw;
+                margin: 40vh 0 0 0;
+            }
+            #forwards,
+            #forwarded-by {
+                min-height: 50px;
+                max-height: 25%;
+            }
+        }
     </style>
 </head>
 
