@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="./data.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: calc(100vw - 300px);
+            position: relative;
+            margin-left: 300px;
+        }
+        .channel-info {
+            position:absolute;
+            width: 300px;
+            height: 100vh;
+            box-sizing: border-box;
+            background-color: #fff;
+            padding: 9px;
+            border-right: 1px solid rgb(215, 215, 215);
+        }
+        #channel-link {
+            display: inline-block;
+            min-height: 50px;
+            text-decoration: none;
+        }
+        #forwards,
+        #forwarded-by {
+            min-height: 50px;
+            max-height: 40vh;
+            overflow-y: auto;
+            margin-bottom: 25px;
+            border: 1px solid rgb(215, 215, 215);
+        }
+        #forwards > a,
+        #forwarded-by > a {
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="channel-info">
+        <p>Channel :</p>
+        <a target="_blank" id="channel-link" href="#"></a>
+        <p>Forwards from:</p>
+        <div id="forwards">
+
+        </div>
+        <p>Forwarded to:</p>
+        <div id="forwarded-by">
+
+        </div>
+    </div>
+    <div id="map">
+    </div>
+    <script type="text/javascript">
+
+        const nodes = [];
+        const edges = [];
+
+        const channelInfo = {}
+
+        Object.values(data.nodes).forEach(({ key, attributes }) => {
+            channelInfo[key] = attributes;
+            channelInfo[key].forwards = [];
+            channelInfo[key].forwarded = [];
+            const newSize = attributes.size * 0.4
+            attributes.size = newSize > 15 ? newSize : 15;
+            attributes.id = key;
+            nodes.push(attributes)
+        })
+
+        Object.values(data.edges).forEach(({ source: from, target: to }) => {
+            if (from !== to) {
+                edges.push({ from, to });
+                channelInfo[from].forwards.push(to);
+                channelInfo[to].forwarded.push(from);
+            }
+        })
+        const graphData = {
+            nodes: new vis.DataSet(nodes),
+            edges: new vis.DataSet(edges),
+        }
+        const container = document.getElementById("map");
+
+        const networkOptions = {
+            autoResize: true,
+            nodes: {
+                shape: 'dot',
+                fixed: true,
+                scaling: {
+                    label: {
+                        enabled: true,
+                    }
+                },
+                font: {
+                    size: 25,
+                    align: 'middle',
+                    background: '#ffffff55',
+                    bold: {
+                        size: 35,
+                    }
+                },
+            },
+            edges: {
+                width: 2,
+                arrowStrikethrough: false,
+                color: {
+                    opacity: 0.2,
+                    highlight: "#04a5efff" 
+                },
+                physics: false,
+                labelHighlightBold: false,
+                selectionWidth: (width) => width+5,
+                selfReference: {
+                    angle: 0.7853981633974483
+                },
+                smooth: {
+                    type: "cubicBezier",
+                    roundness: 0.75,
+                }
+            }
+        }
+        const network = new vis.Network(container, graphData, networkOptions);
+
+        const setChannelLink = (link, name) => {
+            const linkElement = document.querySelector('#channel-link');
+            linkElement.href = link ? `https://t.me/${link}` : "#";
+            linkElement.innerText = name ? name : '';
+        }
+
+        const createLink = (label, link) => {
+            const channelLink = document.createElement('a')
+            channelLink.href = `https://t.me/${link}`;
+            channelLink.innerText = `${label}\n`;
+            channelLink.target = "_blank";
+            return channelLink;
+        }
+
+        const setForwards = (id) => {
+            const forwardsElement = document.querySelector('#forwards');
+            forwardsElement.innerHTML = null;
+            if(id) {
+                channelInfo[id].forwards.forEach((fId) => {
+                    const { label, link } = channelInfo[fId];
+                    const channelLink = createLink(label, link);
+                    forwardsElement.appendChild(channelLink);
+                });
+            } else {
+                forwardsElement.innerHTML = null;
+            }
+        }
+
+        const setForwarded = (id) => {
+            const forwarded = document.querySelector('#forwarded-by');
+            forwarded.innerHTML = null;
+            if(id) {
+                channelInfo[id].forwarded.forEach((fId) => {
+                    const { label, link } = channelInfo[fId];
+                    const channelLink = createLink(label, link);
+                    forwarded.appendChild(channelLink);
+                });
+            } else {
+                forwarded.innerHTML = null;
+            }
+        }
+
+        network.on('selectNode', ({nodes}) => {
+            for(const id of nodes) {
+                const nodesToUpdate = [...network.getConnectedNodes(id), id];
+                nodesToUpdate.forEach(nodeId => {
+                    network.clustering.updateClusteredNode(nodeId, {
+                        size: channelInfo[nodeId].size > 50 ? channelInfo[nodeId].size : 50,
+                        color: {
+                            background: "#bdfccb",
+                            border: "#4c4c4c",
+                            highlight: {
+                                background: "#bdfccb",
+                                border: "#4c4c4c",
+                            }
+                        },
+                    })
+                });
+                setChannelLink(channelInfo[id].link, channelInfo[id].label);
+                setForwards(id);
+                setForwarded(id);
+            }
+        });
+        network.on('deselectNode', ({previousSelection}) => {
+            const { nodes } = previousSelection;
+            for(const { id } of nodes) {
+                const nodesToUpdate = [...network.getConnectedNodes(id), id];
+                nodesToUpdate.forEach(nodeId => {
+                    network.clustering.updateClusteredNode(nodeId, {
+                        size: channelInfo[nodeId].size,
+                        color: null
+                    })
+                })
+            }
+            setChannelLink();
+            setForwards();
+            setForwarded();
+        })
+    </script>
+</body>
+
+</html>
